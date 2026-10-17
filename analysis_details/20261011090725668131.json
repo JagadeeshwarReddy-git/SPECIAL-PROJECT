@@ -1,0 +1,25 @@
+{
+  "text": "fuck you",
+  "records": [
+    {
+      "text": "fuck you",
+      "sentiment": "negative",
+      "sentiment_score": 0.7843443751335144,
+      "emotion": "anger",
+      "emotion_score": 0.8639621138572693,
+      "sentiment_explanation": "The model classified this feedback as negative, but the explanation rules did not find a clear negative keyword or phrase. Review the original text before drawing conclusions. Model-reported confidence: 78.4%.",
+      "evidence_phrases": [],
+      "emotion_explanation": "The model detected signals commonly associated with anger, irritation, or frustration. Model-reported confidence: 86.4%."
+    }
+  ],
+  "metadata": {
+    "analysis_type": "Text",
+    "character_count": 8,
+    "word_count": 2,
+    "sentiment_confidence": 0.7843443751335144,
+    "emotion_confidence": 0.8639621138572693,
+    "sentiment_explanation": "The model classified this feedback as negative, but the explanation rules did not find a clear negative keyword or phrase. Review the original text before drawing conclusions. Model-reported confidence: 78.4%.",
+    "evidence_phrases": [],
+    "emotion_explanation": "The model detected signals commonly associated with anger, irritation, or frustration. Model-reported confidence: 86.4%."
+  }
+}

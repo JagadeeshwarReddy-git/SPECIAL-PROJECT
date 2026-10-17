@@ -1,0 +1,31 @@
+text,actual_sentiment,predicted_sentiment
+This video is absolutely amazing!,positive,positive
+I really enjoyed watching this.,positive,positive
+"Excellent explanation, very helpful.",positive,positive
+This is one of the best videos I have seen.,positive,positive
+Great content and clear presentation.,positive,positive
+I loved every minute of this video.,positive,positive
+Very informative and useful video.,positive,positive
+Fantastic work by the creator.,positive,positive
+This explanation was really good.,positive,positive
+"Thank you, this helped me understand the topic.",positive,positive
+This video is terrible.,negative,negative
+I completely hated this video.,negative,negative
+What a waste of time.,negative,negative
+The explanation is very poor.,negative,negative
+I didn't like this at all.,negative,negative
+This is one of the worst videos I have watched.,negative,negative
+Very disappointing content.,negative,negative
+The information is confusing and bad.,negative,negative
+I regret watching this video.,negative,negative
+This was not useful at all.,negative,negative
+The video is okay.,neutral,positive
+It is an average explanation.,neutral,neutral
+The information is neither good nor bad.,neutral,neutral
+This video explains the topic.,neutral,neutral
+I watched the video today.,neutral,neutral
+The presentation is fairly normal.,neutral,positive
+There are several points discussed in this video.,neutral,neutral
+The video contains some information about the topic.,neutral,neutral
+I have seen this type of explanation before.,neutral,neutral
+The speaker discusses the subject in the video.,neutral,neutral

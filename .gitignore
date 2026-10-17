@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+analysis_history.json
+analysis_details/
+analysis.db
+social_media.db

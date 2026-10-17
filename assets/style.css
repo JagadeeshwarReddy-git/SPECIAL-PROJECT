@@ -1,0 +1,39 @@
+.stApp {
+    background-color: #f5f7fa;
+}
+
+h1 {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+h2 {
+    color: #1e293b;
+}
+
+section[data-testid="stSidebar"] {
+    background-color: #0f172a;
+}
+
+section[data-testid="stSidebar"] * {
+    color: white;
+}
+
+div[data-testid="metric-container"] {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0px 3px 10px rgba(0,0,0,0.15);
+}
+
+.stButton>button {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+}
+
+.stButton>button:hover {
+    background-color: #1d4ed8;
+}

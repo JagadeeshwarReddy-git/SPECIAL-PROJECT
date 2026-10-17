@@ -1,0 +1,25 @@
+{
+  "text": "hello",
+  "records": [
+    {
+      "text": "hello",
+      "sentiment": "neutral",
+      "sentiment_score": 0.5090620517730713,
+      "emotion": "neutral",
+      "emotion_score": 0.9615552425384521,
+      "sentiment_explanation": "The model predicted neutral sentiment, but this simple rule-based checker did not find matching predefined keywords. The model may use other language patterns that this checker does not capture. The model's reported confidence score is 50.9%.",
+      "evidence_phrases": "No matching predefined clues found",
+      "emotion_explanation": "The model detected no strong dominant emotion. The model's reported confidence score is 96.2%."
+    }
+  ],
+  "metadata": {
+    "analysis_type": "Text",
+    "character_count": 5,
+    "word_count": 1,
+    "sentiment_confidence": 0.5090620517730713,
+    "emotion_confidence": 0.9615552425384521,
+    "sentiment_explanation": "The model predicted neutral sentiment, but this simple rule-based checker did not find matching predefined keywords. The model may use other language patterns that this checker does not capture. The model's reported confidence score is 50.9%.",
+    "evidence_phrases": "No matching predefined clues found",
+    "emotion_explanation": "The model detected no strong dominant emotion. The model's reported confidence score is 96.2%."
+  }
+}
