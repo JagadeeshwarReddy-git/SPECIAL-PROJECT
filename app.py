@@ -74,21 +74,29 @@ with st.sidebar:
 
     st.divider()
 
+    page_options = [
+        "🏠 Home",
+        "📺 YouTube Analyzer",
+        "📝 Text Analyzer",
+        "📂 CSV Upload",
+        "📊 Analytics",
+        "📈 Trend Analyzer",
+        "🤖 AI Assistant",
+        "🧠 AI Insights",
+        "📄 Reports",
+        "🕒 History",
+        "📉 Dashboard",
+    ]
+
+    if "navigation_page" in st.session_state:
+        requested_page = st.session_state.pop("navigation_page")
+        if requested_page in page_options:
+            st.session_state["Navigation"] = requested_page
+
     page = st.radio(
         "Navigation",
-        [
-            "🏠 Home",
-            "📺 YouTube Analyzer",
-            "📝 Text Analyzer",
-            "📂 CSV Upload",
-            "📊 Analytics",
-            "📈 Trend Analyzer",
-            "🤖 AI Assistant",
-            "🧠 AI Insights",
-            "📄 Reports",
-            "🕒 History",
-            "📉 Dashboard"
-        ]
+        page_options,
+        key="Navigation",
     )
 
     st.divider()
