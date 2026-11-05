@@ -1,15 +1,11 @@
+
 import re
 from collections import Counter
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
-
-# ==========================================================
-# COLORFUL TREND ANALYZER
-# ==========================================================
 
 STOPWORDS = {
     "the", "and", "for", "that", "this", "with", "from", "have",
@@ -20,12 +16,12 @@ STOPWORDS = {
     "being", "into", "than", "then", "there", "here", "its",
     "our", "out", "get", "got", "getting", "also", "more",
     "most", "some", "such", "only", "really", "still", "much",
-    "many", "one", "two", "three", "like", "make", "made",
-    "did", "does", "is", "it", "in", "on", "of", "to", "a",
-    "an", "as", "at", "by", "be", "or", "if", "so", "we", "i",
-    "me", "my", "he", "she", "his", "her", "our", "us",
-    "im", "ive", "youre", "theyre", "dont", "didnt", "doesnt",
-    "wasnt", "wont", "yeah", "yes", "no", "okay", "ok"
+    "many", "one", "two", "three", "make", "made", "did",
+    "does", "is", "it", "in", "on", "of", "to", "a", "an",
+    "as", "at", "by", "be", "or", "if", "so", "we", "i",
+    "me", "my", "he", "she", "his", "her", "us", "im",
+    "ive", "youre", "theyre", "dont", "didnt", "doesnt",
+    "wasnt", "wont", "yeah", "yes", "no", "okay", "ok",
 }
 
 GENERIC_WORDS = {
@@ -33,43 +29,46 @@ GENERIC_WORDS = {
     "youtube", "watch", "watched", "watching", "people",
     "person", "thing", "things", "time", "day", "days",
     "content", "thanks", "thank", "hello", "hey", "guys",
-    "guy", "everyone", "someone", "something"
+    "everyone", "someone", "something",
 }
 
-POSITIVE_WORDS = {
-    "good", "great", "excellent", "amazing", "awesome", "love",
-    "loved", "like", "liked", "best", "beautiful", "helpful",
-    "perfect", "fantastic", "wonderful", "interesting", "enjoy",
-    "enjoyed", "useful", "impressive", "brilliant", "happy"
-}
 
-NEGATIVE_WORDS = {
-    "bad", "worst", "hate", "hated", "boring", "poor", "terrible",
-    "awful", "disappointing", "disappointed", "waste", "wrong",
-    "problem", "problems", "issue", "issues", "expensive", "slow",
-    "fake", "confusing", "useless", "annoying", "sad"
-}
+def find_column(df, candidates):
+    lookup = {
+        str(column).strip().lower(): column
+        for column in df.columns
+    }
+
+    for candidate in candidates:
+        if candidate.lower() in lookup:
+            return lookup[candidate.lower()]
+
+    return None
 
 
 def find_text_column(df):
-    candidates = [
-        "comment", "comments", "text", "content", "review",
-        "reviews", "message", "feedback", "clean_comment"
-    ]
+    column = find_column(
+        df,
+        [
+            "comment", "comments", "text", "content",
+            "review", "reviews", "message", "feedback",
+            "clean_comment", "post", "caption", "description",
+        ],
+    )
 
-    for col in candidates:
-        if col in df.columns:
-            return col
+    if column is not None:
+        return column
 
-    # Fallback: choose the object/string column with the most text.
-    object_cols = df.select_dtypes(include=["object", "string"]).columns
+    object_columns = df.select_dtypes(
+        include=["object", "string"]
+    ).columns
 
-    best_col = None
+    best_column = None
     best_length = 0
 
-    for col in object_cols:
+    for column in object_columns:
         length = (
-            df[col]
+            df[column]
             .fillna("")
             .astype(str)
             .str.len()
@@ -77,10 +76,10 @@ def find_text_column(df):
         )
 
         if length > best_length:
-            best_col = col
+            best_column = column
             best_length = length
 
-    return best_col
+    return best_column
 
 
 def clean_words(text, strict=True):
@@ -89,22 +88,16 @@ def clean_words(text, strict=True):
     text = re.sub(
         r"https?://\S+|www\.\S+",
         " ",
-        text
+        text,
     )
 
     text = re.sub(r"[@#]", " ", text)
     text = re.sub(r"[^a-z0-9\s]", " ", text)
 
-    words = text.split()
-
     result = []
 
-    for word in words:
-
-        if len(word) < 3:
-            continue
-
-        if word.isdigit():
+    for word in text.split():
+        if len(word) < 3 or word.isdigit():
             continue
 
         if word in STOPWORDS:
@@ -115,46 +108,71 @@ def clean_words(text, strict=True):
 
         result.append(word)
 
-    # Important fallback:
-    # if aggressive filtering removed everything,
-    # use less-filtered words.
     if not result and strict:
         return clean_words(text, strict=False)
 
     return result
 
 
-def get_words_by_record(df, text_col):
-    records = []
+def sentiment_label(value):
+    value = str(value).strip().lower()
 
-    for text in df[text_col]:
-        records.append(
-            clean_words(text)
-        )
+    if value in {"positive", "pos", "very positive"}:
+        return "Positive"
 
-    return records
+    if value in {"negative", "neg", "very negative"}:
+        return "Negative"
+
+    if value in {"neutral", "neu"}:
+        return "Neutral"
+
+    if value in {"label_2"}:
+        return "Positive"
+
+    if value in {"label_0"}:
+        return "Negative"
+
+    if value in {"label_1"}:
+        return "Neutral"
+
+    return "Unknown"
 
 
-def count_words(records):
+def get_shared_analysis_data():
+    """Retrieve analysis results regardless of the input page."""
+
+    for key in (
+        "analysis_df",
+        "universal_analysis_df",
+        "df",
+    ):
+        candidate = st.session_state.get(key)
+
+        if isinstance(candidate, pd.DataFrame) and not candidate.empty:
+            return candidate.copy()
+
+    return None
+
+
+def build_word_counts(texts):
     counter = Counter()
 
-    for words in records:
-        # A topic is counted once per record.
+    for text in texts:
+        words = clean_words(text)
         counter.update(set(words))
 
     return counter
 
 
-def count_phrases(records, n=2):
+def build_phrase_counts(texts, phrase_size=2):
     counter = Counter()
 
-    for words in records:
+    for text in texts:
+        words = clean_words(text)
 
         phrases = [
-            " ".join(words[i:i+n])
-            for i in range(
-                len(words) - n + 1
-            )
+            " ".join(words[i:i + phrase_size])
+            for i in range(len(words) - phrase_size + 1)
         ]
 
         counter.update(set(phrases))
@@ -162,1130 +180,585 @@ def count_phrases(records, n=2):
     return counter
 
 
-def sentiment_label(value):
-    value = str(value).strip().lower()
+def build_topic_sentiment(df, text_column, sentiment_column, topics):
+    records = []
 
-    if value in ["positive", "pos"]:
-        return "Positive"
-
-    if value in ["negative", "neg"]:
-        return "Negative"
-
-    if value in ["neutral", "neu"]:
-        return "Neutral"
-
-    return value.title()
-
-
-def topic_sentiment_data(
-    df,
-    text_col,
-    top_topics
-):
-
-    if "sentiment" not in df.columns:
+    if sentiment_column is None:
         return pd.DataFrame()
-
-    rows = []
 
     for _, row in df.iterrows():
+        words = set(clean_words(row[text_column]))
+        sentiment = sentiment_label(row[sentiment_column])
 
-        words = set(
-            clean_words(
-                row[text_col]
-            )
-        )
-
-        sentiment = sentiment_label(
-            row["sentiment"]
-        )
-
-        for word in words:
-
-            if word in top_topics:
-
-                rows.append(
-                    {
-                        "Topic": word,
-                        "Sentiment": sentiment
-                    }
-                )
-
-    if not rows:
-        return pd.DataFrame()
-
-    temp = pd.DataFrame(rows)
-
-    result = (
-        temp
-        .groupby(
-            ["Topic", "Sentiment"]
-        )
-        .size()
-        .reset_index(
-            name="Mentions"
-        )
-    )
-
-    return result
-
-
-def topic_emotion_data(
-    df,
-    text_col,
-    top_topics
-):
-
-    if "emotion" not in df.columns:
-        return pd.DataFrame()
-
-    rows = []
-
-    for _, row in df.iterrows():
-
-        words = set(
-            clean_words(
-                row[text_col]
-            )
-        )
-
-        emotion = str(
-            row["emotion"]
-        ).strip().title()
-
-        if emotion.lower() in [
-            "", "nan", "unknown"
-        ]:
+        if sentiment == "Unknown":
             continue
 
-        for word in words:
+        for topic in topics:
+            if topic in words:
+                records.append({
+                    "Topic": topic,
+                    "Sentiment": sentiment,
+                    "Mentions": 1,
+                })
 
-            if word in top_topics:
-
-                rows.append(
-                    {
-                        "Topic": word,
-                        "Emotion": emotion
-                    }
-                )
-
-    if not rows:
+    if not records:
         return pd.DataFrame()
 
     return (
-        pd.DataFrame(rows)
-        .groupby(
-            ["Topic", "Emotion"]
-        )
-        .size()
-        .reset_index(
-            name="Mentions"
-        )
+        pd.DataFrame(records)
+        .groupby(["Topic", "Sentiment"], as_index=False)["Mentions"]
+        .sum()
     )
 
 
-def card(title, value, subtitle, emoji):
-    st.markdown(
-        f"""
-        <div class="trend-card">
-            <div class="trend-card-icon">{emoji}</div>
-            <div class="trend-card-title">{title}</div>
-            <div class="trend-card-value">{value}</div>
-            <div class="trend-card-sub">{subtitle}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
+def build_topic_emotions(df, text_column, emotion_column, topics):
+    records = []
+
+    if emotion_column is None:
+        return pd.DataFrame()
+
+    for _, row in df.iterrows():
+        words = set(clean_words(row[text_column]))
+        emotion = str(row[emotion_column]).strip().title()
+
+        if emotion.lower() in {"", "nan", "none", "unknown"}:
+            continue
+
+        for topic in topics:
+            if topic in words:
+                records.append({
+                    "Topic": topic,
+                    "Emotion": emotion,
+                    "Mentions": 1,
+                })
+
+    if not records:
+        return pd.DataFrame()
+
+    return (
+        pd.DataFrame(records)
+        .groupby(["Topic", "Emotion"], as_index=False)["Mentions"]
+        .sum()
     )
-
-
-def chart_style(fig, height=420):
-    fig.update_layout(
-        height=height,
-        margin=dict(
-            l=25,
-            r=25,
-            t=65,
-            b=30
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        title=dict(
-            x=0.02,
-            font=dict(size=19)
-        ),
-        font=dict(size=12)
-    )
-
-    return fig
 
 
 def show():
-
-    # ======================================================
-    # COLORFUL APPLICATION STYLE
-    # ======================================================
-
     st.markdown(
         """
         <style>
-
         .trend-header {
-            padding: 24px 28px;
-            border-radius: 20px;
-            margin-bottom: 22px;
-            background: linear-gradient(
-                135deg,
-                #667eea 0%,
-                #764ba2 50%,
-                #f093fb 100%
-            );
+            padding: 24px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
             color: white;
         }
-
         .trend-header h1 {
             color: white;
             margin: 0;
-            font-size: 2.2rem;
         }
-
         .trend-header p {
-            color: rgba(255,255,255,.90);
-            margin: 7px 0 0 0;
-            font-size: 1rem;
-        }
-
-        .trend-card {
-            border-radius: 18px;
-            padding: 18px;
-            min-height: 145px;
             color: white;
-            box-shadow: 0 8px 25px rgba(0,0,0,.10);
-            background: linear-gradient(
-                135deg,
-                #667eea,
-                #764ba2
-            );
+            margin-top: 8px;
         }
-
-        .trend-card-icon {
-            font-size: 25px;
-        }
-
-        .trend-card-title {
-            margin-top: 7px;
-            font-size: 13px;
-            opacity: .88;
-            text-transform: uppercase;
-            letter-spacing: .5px;
-        }
-
-        .trend-card-value {
-            margin-top: 4px;
-            font-size: 29px;
-            font-weight: 800;
-        }
-
-        .trend-card-sub {
-            margin-top: 4px;
-            font-size: 12px;
-            opacity: .80;
-        }
-
-        .topic-pill {
-            display: inline-block;
-            padding: 8px 13px;
-            margin: 4px;
-            border-radius: 20px;
-            background: linear-gradient(
-                135deg,
-                #667eea,
-                #f093fb
-            );
-            color: white;
-            font-weight: 650;
-        }
-
-        .trend-section {
-            padding: 12px 0 2px 0;
-        }
-
-        .summary-box {
-            border-radius: 17px;
-            padding: 20px;
-            background: linear-gradient(
-                135deg,
-                rgba(102,126,234,.12),
-                rgba(240,147,251,.12)
-            );
-            border: 1px solid rgba(118,75,162,.18);
-        }
-
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-
-    # ======================================================
-    # HEADER
-    # ======================================================
 
     st.markdown(
         """
         <div class="trend-header">
             <h1>📈 Trend Analyzer</h1>
             <p>
-                Automatically discover what your audience is talking about,
-                which topics are popular, how people react, and what emotions
-                are connected to those topics.
+                Discover popular topics, repeated phrases, audience
+                sentiment, and emotions in your analyzed content.
             </p>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-    # ======================================================
-    # DATA
-    # ======================================================
+    # --------------------------------------------------------
+    # LOAD SHARED ANALYSIS DATA
+    # --------------------------------------------------------
 
-    df = st.session_state.get(
-        "analysis_df"
-    )
+    df = get_shared_analysis_data()
 
     if df is None:
-
-        st.info(
-            "📂 Analyze a YouTube video, text, or CSV first. "
-            "Your trends will automatically appear here."
+        st.warning(
+            "No analyzed data is available. Open CSV Upload, upload "
+            "your file, and click Analyze file first."
         )
+
+        if st.button("Open CSV Upload"):
+            st.session_state["navigation_page"] = "📂 CSV Upload"
+            st.rerun()
 
         return
 
-    if not isinstance(
+    text_column = find_text_column(df)
+
+    if text_column is None:
+        st.error(
+            "No text column was found. Your dataset needs a column "
+            "such as text, comment, content, review, or message."
+        )
+
+        st.write("Available columns:", list(df.columns))
+        return
+
+    sentiment_column = find_column(
         df,
-        pd.DataFrame
-    ) or df.empty:
+        ["sentiment", "predicted_sentiment", "sentiment_label"],
+    )
 
-        st.info(
-            "📂 No analyzed records are available."
-        )
-
-        return
+    emotion_column = find_column(
+        df,
+        ["emotion", "predicted_emotion", "emotion_label"],
+    )
 
     data = df.copy()
 
-    text_col = find_text_column(
-        data
-    )
-
-    if text_col is None:
-
-        st.error(
-            "❌ No text column was found."
-        )
-
-        return
-
-    data[text_col] = (
-        data[text_col]
+    data[text_column] = (
+        data[text_column]
         .fillna("")
         .astype(str)
+        .str.strip()
     )
 
-    data = data[
-        data[text_col]
-        .str.strip()
-        != ""
-    ]
+    data = data[data[text_column] != ""].copy()
 
     if data.empty:
-
-        st.warning(
-            "No usable text was found."
-        )
-
+        st.warning("The selected text column contains no usable text.")
         return
 
-    # ======================================================
-    # AUTOMATIC ANALYSIS
-    # ======================================================
-
-    records = get_words_by_record(
-        data,
-        text_col
-    )
-
-    word_counter = count_words(
-        records
-    )
-
-    phrase_counter = count_phrases(
-        records,
-        2
-    )
-
-    triple_counter = count_phrases(
-        records,
-        3
-    )
-
-    # Ensure single-record text still has topics.
-    if not word_counter:
-
-        fallback_records = [
-            clean_words(
-                text,
-                strict=False
-            )
-            for text in data[text_col]
-        ]
-
-        word_counter = count_words(
-            fallback_records
+    # Normalize sentiment and emotion labels.
+    if sentiment_column:
+        data[sentiment_column] = data[sentiment_column].apply(
+            sentiment_label
         )
 
-    top_words = word_counter.most_common(
-        20
-    )
-
-    top_phrases = [
-        item
-        for item in phrase_counter.most_common(15)
-        if item[1] >= 1
-    ]
-
-    top_triples = [
-        item
-        for item in triple_counter.most_common(15)
-        if item[1] >= 1
-    ]
-
-    # ======================================================
-    # SUMMARY VALUES
-    # ======================================================
-
-    total_records = len(data)
-    unique_words = len(word_counter)
-
-    total_mentions = sum(
-        word_counter.values()
-    )
-
-    if "sentiment" in data.columns:
-
-        sentiments = (
-            data["sentiment"]
-            .map(sentiment_label)
-        )
-
-        dominant_sentiment = (
-            sentiments
-            .value_counts()
-            .idxmax()
-        )
-
-    else:
-
-        dominant_sentiment = "N/A"
-
-    if "emotion" in data.columns:
-
-        emotions = (
-            data["emotion"]
+    if emotion_column:
+        data[emotion_column] = (
+            data[emotion_column]
+            .fillna("Unknown")
             .astype(str)
+            .str.strip()
             .str.title()
         )
 
-        dominant_emotion = (
-            emotions
-            .value_counts()
-            .idxmax()
-        )
-
-    else:
-
-        dominant_emotion = "N/A"
-
-    # ======================================================
-    # COLORFUL KPI ROW
-    # ======================================================
-
-    st.markdown(
-        '<div class="trend-section"></div>',
-        unsafe_allow_html=True
+    st.caption(
+        f"Source: {st.session_state.get('analysis_source', st.session_state.get('universal_analysis_filename', 'Current analysis'))}"
     )
 
-    k1, k2, k3, k4 = st.columns(4)
+    # --------------------------------------------------------
+    # KEY METRICS
+    # --------------------------------------------------------
 
-    with k1:
-        card(
-            "Records",
-            f"{total_records:,}",
-            "Analyzed records",
-            "📊"
-        )
+    texts = data[text_column].tolist()
+    word_counts = build_word_counts(texts)
+    phrase_counts = build_phrase_counts(texts, 2)
+    triple_counts = build_phrase_counts(texts, 3)
 
-    with k2:
-        card(
-            "Topics",
-            f"{unique_words:,}",
-            "Meaningful topics found",
-            "🔥"
-        )
+    top_words = word_counts.most_common(15)
+    top_phrases = phrase_counts.most_common(10)
+    top_triples = triple_counts.most_common(10)
 
-    with k3:
-        card(
-            "Mentions",
-            f"{total_mentions:,}",
-            "Topic mentions",
-            "💬"
-        )
+    total_records = len(data)
+    total_words = sum(len(clean_words(text)) for text in texts)
+    unique_words = len(word_counts)
 
-    with k4:
-        card(
-            "Mood",
-            dominant_sentiment,
-            f"Emotion: {dominant_emotion}",
-            "😊"
-        )
+    c1, c2, c3, c4 = st.columns(4)
 
-    # ======================================================
-    # TOP TOPICS
-    # ======================================================
+    c1.metric("Analyzed Records", f"{total_records:,}")
+    c2.metric("Words Processed", f"{total_words:,}")
+    c3.metric("Unique Topics", f"{unique_words:,}")
+    c4.metric(
+        "Repeated Phrases",
+        sum(count for _, count in top_phrases),
+    )
 
-    st.markdown("### 🔥 What People Are Talking About")
+    # --------------------------------------------------------
+    # POPULAR TOPICS
+    # --------------------------------------------------------
+
+    st.divider()
+    st.subheader("🔥 Most Discussed Topics")
 
     if top_words:
-
-        word_df = pd.DataFrame(
+        topics_df = pd.DataFrame(
             top_words,
-            columns=[
-                "Topic",
-                "Mentions"
-            ]
+            columns=["Topic", "Mentions"],
+        ).sort_values("Mentions")
+
+        fig = px.bar(
+            topics_df,
+            x="Mentions",
+            y="Topic",
+            orientation="h",
+            text="Mentions",
+            color="Mentions",
+            color_continuous_scale="Viridis",
+            title="Most Frequently Mentioned Topics",
         )
 
-        left, right = st.columns(
-            [1.45, 1]
+        fig.update_layout(
+            height=max(400, len(topics_df) * 32),
+            coloraxis_showscale=False,
         )
 
-        with left:
+        st.plotly_chart(fig, use_container_width=True)
 
-            fig = px.bar(
-                word_df.sort_values(
-                    "Mentions"
-                ),
+        st.markdown("#### Topic Highlights")
 
-                x="Mentions",
-                y="Topic",
-
-                orientation="h",
-
-                text="Mentions",
-
-                title="🔥 Top Discussion Topics",
-
-                color="Mentions",
-
-                color_continuous_scale="Turbo"
-            )
-
-            fig.update_traces(
-                textposition="outside"
-            )
-
-            fig.update_layout(
-                coloraxis_showscale=False
-            )
-
-            st.plotly_chart(
-                chart_style(
-                    fig,
-                    570
-                ),
-                use_container_width=True
-            )
-
-        with right:
-
-            # Bubble-style topic map.
-            bubble = word_df.copy()
-
-            bubble["Rank"] = range(
-                len(bubble),
-                0,
-                -1
-            )
-
-            fig = px.scatter(
-                bubble,
-
-                x="Rank",
-                y="Mentions",
-
-                size="Mentions",
-
-                text="Topic",
-
-                color="Mentions",
-
-                color_continuous_scale="Turbo",
-
-                size_max=70,
-
-                title="🌈 Topic Bubble Map"
-            )
-
-            fig.update_traces(
-                textposition="middle center"
-            )
-
-            fig.update_xaxes(
-                visible=False
-            )
-
-            fig.update_yaxes(
-                title="Mentions"
-            )
-
-            fig.update_layout(
-                coloraxis_showscale=False
-            )
-
-            st.plotly_chart(
-                chart_style(
-                    fig,
-                    570
-                ),
-                use_container_width=True
-            )
-
+        st.markdown(
+            " ".join(
+                f'<span style="display:inline-block;padding:7px 12px;'
+                f'margin:4px;border-radius:18px;background:#7057c8;'
+                f'color:white">{topic} ({count})</span>'
+                for topic, count in top_words[:12]
+            ),
+            unsafe_allow_html=True,
+        )
     else:
+        st.info("No meaningful keywords were found in the uploaded text.")
 
-        st.warning(
-            "No topics could be extracted from the current text."
-        )
-
-    # ======================================================
-    # TOPIC CLOUD / PILLS
-    # ======================================================
-
-    st.markdown(
-        "### ☁️ Trending Words"
-    )
-
-    if top_words:
-
-        html = ""
-
-        for word, count in top_words:
-
-            html += (
-                f'<span class="topic-pill">'
-                f'{word} · {count}'
-                f'</span>'
-            )
-
-        st.markdown(
-            html,
-            unsafe_allow_html=True
-        )
-
-    # ======================================================
+    # --------------------------------------------------------
     # COMMON PHRASES
-    # ======================================================
+    # --------------------------------------------------------
 
-    st.markdown(
-        "### 💬 Trending Phrases"
-    )
+    st.divider()
+    st.subheader("💬 Common Phrases")
 
-    phrase_left, phrase_right = st.columns(
-        2
-    )
+    left, right = st.columns(2)
 
-    with phrase_left:
-
+    with left:
         if top_phrases:
-
             phrase_df = pd.DataFrame(
-                top_phrases[:10],
-                columns=[
-                    "Phrase",
-                    "Mentions"
-                ]
-            )
+                top_phrases,
+                columns=["Phrase", "Mentions"],
+            ).sort_values("Mentions")
 
             fig = px.bar(
-                phrase_df.sort_values(
-                    "Mentions"
-                ),
-
+                phrase_df,
                 x="Mentions",
                 y="Phrase",
-
                 orientation="h",
-
                 text="Mentions",
-
-                title="💬 Common Phrases",
-
+                title="Common Two-Word Phrases",
                 color="Mentions",
-
-                color_continuous_scale="Viridis"
+                color_continuous_scale="Viridis",
             )
 
-            fig.update_traces(
-                textposition="outside"
-            )
-
-            fig.update_layout(
-                coloraxis_showscale=False
-            )
-
-            st.plotly_chart(
-                chart_style(fig, 450),
-                use_container_width=True
-            )
-
+            fig.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
         else:
+            st.info("No repeated two-word phrases were found.")
 
-            st.info(
-                "No phrases available."
-            )
-
-    with phrase_right:
-
+    with right:
         if top_triples:
-
             triple_df = pd.DataFrame(
-                top_triples[:10],
-                columns=[
-                    "Phrase",
-                    "Mentions"
-                ]
-            )
+                top_triples,
+                columns=["Phrase", "Mentions"],
+            ).sort_values("Mentions")
 
             fig = px.bar(
-                triple_df.sort_values(
-                    "Mentions"
-                ),
-
+                triple_df,
                 x="Mentions",
                 y="Phrase",
-
                 orientation="h",
-
                 text="Mentions",
-
-                title="🗣️ Common 3-Word Phrases",
-
+                title="Common Three-Word Phrases",
                 color="Mentions",
-
-                color_continuous_scale="Plasma"
+                color_continuous_scale="Plasma",
             )
 
-            fig.update_traces(
-                textposition="outside"
-            )
-
-            fig.update_layout(
-                coloraxis_showscale=False
-            )
-
-            st.plotly_chart(
-                chart_style(fig, 450),
-                use_container_width=True
-            )
-
+            fig.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
         else:
+            st.info("No repeated three-word phrases were found.")
 
-            st.info(
-                "No three-word phrases available."
-            )
-
-    # ======================================================
-    # SENTIMENT BY TOPIC
-    # ======================================================
-
-    topic_sentiment = topic_sentiment_data(
-        data,
-        text_col,
-        set(
-            word
-            for word, _ in top_words[:12]
-        )
-    )
-
-    if not topic_sentiment.empty:
-
-        st.markdown(
-            "### 😊 How People Feel About Each Topic"
-        )
-
-        fig = px.bar(
-            topic_sentiment,
-
-            x="Topic",
-            y="Mentions",
-
-            color="Sentiment",
-
-            barmode="group",
-
-            text="Mentions",
-
-            title="Sentiment Across Trending Topics"
-        )
-
-        fig.update_traces(
-            textposition="outside"
-        )
-
-        fig.update_xaxes(
-            tickangle=-35
-        )
-
-        st.plotly_chart(
-            chart_style(
-                fig,
-                520
-            ),
-            use_container_width=True
-        )
-
-        # --------------------------------------------------
-        # Sentiment topic table
-        # --------------------------------------------------
-
-        pivot = (
-            topic_sentiment
-            .pivot(
-                index="Topic",
-                columns="Sentiment",
-                values="Mentions"
-            )
-            .fillna(0)
-        )
-
-        for col in [
-            "Positive",
-            "Neutral",
-            "Negative"
-        ]:
-
-            if col not in pivot.columns:
-                pivot[col] = 0
-
-        pivot["Total"] = (
-            pivot["Positive"]
-            + pivot["Neutral"]
-            + pivot["Negative"]
-        )
-
-        pivot["Positive %"] = (
-            pivot["Positive"]
-            / pivot["Total"]
-            * 100
-        ).round(1)
-
-        pivot["Neutral %"] = (
-            pivot["Neutral"]
-            / pivot["Total"]
-            * 100
-        ).round(1)
-
-        pivot["Negative %"] = (
-            pivot["Negative"]
-            / pivot["Total"]
-            * 100
-        ).round(1)
-
-        st.dataframe(
-            pivot.reset_index(),
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # ======================================================
-    # EMOTION ANALYSIS
-    # ======================================================
-
-    topic_emotion = topic_emotion_data(
-        data,
-        text_col,
-        set(
-            word
-            for word, _ in top_words[:10]
-        )
-    )
-
-    if not topic_emotion.empty:
-
-        st.markdown(
-            "### 🎭 Emotions Connected to Trending Topics"
-        )
-
-        fig = px.bar(
-            topic_emotion,
-
-            x="Topic",
-
-            y="Mentions",
-
-            color="Emotion",
-
-            barmode="stack",
-
-            text="Mentions",
-
-            title="Emotion Distribution by Topic"
-        )
-
-        fig.update_traces(
-            textposition="inside"
-        )
-
-        fig.update_xaxes(
-            tickangle=-35
-        )
-
-        st.plotly_chart(
-            chart_style(
-                fig,
-                520
-            ),
-            use_container_width=True
-        )
-
-    # ======================================================
+    # --------------------------------------------------------
     # SENTIMENT OVERVIEW
-    # ======================================================
+    # --------------------------------------------------------
 
-    if "sentiment" in data.columns:
+    st.divider()
+    st.subheader("😊 Audience Sentiment")
 
-        st.markdown(
-            "### 🎯 Audience Reaction"
-        )
-
+    if sentiment_column:
         sentiment_counts = (
-            data["sentiment"]
-            .map(sentiment_label)
+            data[sentiment_column]
             .value_counts()
-            .reset_index()
+            .rename_axis("Sentiment")
+            .reset_index(name="Records")
         )
 
-        sentiment_counts.columns = [
-            "Sentiment",
-            "Records"
+        sentiment_counts = sentiment_counts[
+            sentiment_counts["Sentiment"] != "Unknown"
         ]
 
-        left, right = st.columns(
-            2
+        if not sentiment_counts.empty:
+            left, right = st.columns(2)
+
+            with left:
+                fig = px.pie(
+                    sentiment_counts,
+                    names="Sentiment",
+                    values="Records",
+                    hole=0.5,
+                    title="Sentiment Distribution",
+                    color="Sentiment",
+                    color_discrete_map={
+                        "Positive": "#16A34A",
+                        "Neutral": "#CA8A04",
+                        "Negative": "#DC2626",
+                    },
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            with right:
+                fig = px.bar(
+                    sentiment_counts,
+                    x="Sentiment",
+                    y="Records",
+                    color="Sentiment",
+                    text="Records",
+                    title="Sentiment Comparison",
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            top_topics = [topic for topic, _ in top_words[:12]]
+
+            topic_sentiment = build_topic_sentiment(
+                data,
+                text_column,
+                sentiment_column,
+                top_topics,
+            )
+
+            if not topic_sentiment.empty:
+                st.subheader("Sentiment Across Trending Topics")
+
+                fig = px.bar(
+                    topic_sentiment,
+                    x="Topic",
+                    y="Mentions",
+                    color="Sentiment",
+                    barmode="group",
+                    text="Mentions",
+                )
+
+                fig.update_layout(xaxis_tickangle=-35)
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.dataframe(
+                    topic_sentiment,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        else:
+            st.info("No recognized sentiment labels are available.")
+    else:
+        st.info(
+            "This dataset has not been analyzed for sentiment. "
+            "Run Analyze file in CSV Upload to enable sentiment trends."
         )
 
-        with left:
+    # --------------------------------------------------------
+    # EMOTION ANALYSIS
+    # --------------------------------------------------------
 
-            fig = px.pie(
-                sentiment_counts,
+    st.divider()
+    st.subheader("🎭 Emotion Trends")
 
-                names="Sentiment",
-
-                values="Records",
-
-                hole=.55,
-
-                title="Audience Sentiment",
-
-                color_discrete_sequence=[
-                    "#00C853",
-                    "#FFC107",
-                    "#FF1744"
-                ]
+    if emotion_column:
+        emotion_data = data[
+            ~data[emotion_column].str.lower().isin(
+                ["", "nan", "none", "unknown"]
             )
+        ]
 
-            fig.update_traces(
-                textinfo="percent+label"
+        if not emotion_data.empty:
+            emotion_counts = (
+                emotion_data[emotion_column]
+                .value_counts()
+                .rename_axis("Emotion")
+                .reset_index(name="Records")
             )
-
-            st.plotly_chart(
-                chart_style(
-                    fig,
-                    400
-                ),
-                use_container_width=True
-            )
-
-        with right:
 
             fig = px.bar(
-                sentiment_counts,
-
-                x="Sentiment",
-
+                emotion_counts,
+                x="Emotion",
                 y="Records",
-
+                color="Emotion",
                 text="Records",
-
-                title="Sentiment Comparison",
-
-                color="Sentiment",
-
-                color_discrete_sequence=[
-                    "#00C853",
-                    "#FFC107",
-                    "#FF1744"
-                ]
+                title="Emotion Distribution",
             )
 
-            fig.update_traces(
-                textposition="outside"
+            st.plotly_chart(fig, use_container_width=True)
+
+            top_topics = [topic for topic, _ in top_words[:10]]
+
+            topic_emotions = build_topic_emotions(
+                data,
+                text_column,
+                emotion_column,
+                top_topics,
             )
 
-            st.plotly_chart(
-                chart_style(
-                    fig,
-                    400
-                ),
-                use_container_width=True
-            )
+            if not topic_emotions.empty:
+                st.subheader("Emotions Connected to Topics")
 
-    # ======================================================
+                fig = px.bar(
+                    topic_emotions,
+                    x="Topic",
+                    y="Mentions",
+                    color="Emotion",
+                    barmode="stack",
+                    text="Mentions",
+                )
+
+                fig.update_layout(xaxis_tickangle=-35)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No usable emotion labels are available.")
+    else:
+        st.info(
+            "Emotion results are unavailable. Run the file analysis "
+            "first to generate emotion labels."
+        )
+
+    # --------------------------------------------------------
     # AUTOMATIC INSIGHTS
-    # ======================================================
+    # --------------------------------------------------------
 
-    st.markdown(
-        "### 💡 Automatic Trend Insights"
-    )
+    st.divider()
+    st.subheader("💡 Automatic Trend Insights")
 
     if top_words:
-
-        top_topic = top_words[0][0]
-        top_count = top_words[0][1]
+        top_topic, top_count = top_words[0]
 
         second_topic = (
-            top_words[1][0]
-            if len(top_words) > 1
-            else "N/A"
+            top_words[1][0] if len(top_words) > 1 else "N/A"
         )
 
         third_topic = (
-            top_words[2][0]
-            if len(top_words) > 2
-            else "N/A"
-        )
-
-        top_phrase = (
-            top_phrases[0][0]
-            if top_phrases
-            else "No repeated phrase"
+            top_words[2][0] if len(top_words) > 2 else "N/A"
         )
 
         st.markdown(
             f"""
-            <div class="summary-box">
+            **Most discussed topic:** {top_topic} ({top_count} records)
 
-            <h4>📌 What the data is saying</h4>
+            **Other popular topics:** {second_topic}, {third_topic}
 
-            <p>
-            🔥 <b>{top_topic}</b> is the most discussed topic,
-            appearing in <b>{top_count}</b> analyzed record(s).
-            </p>
-
-            <p>
-            📈 Other major topics include
-            <b>{second_topic}</b> and <b>{third_topic}</b>.
-            </p>
-
-            <p>
-            💬 The most repeated phrase is
-            <b>“{top_phrase}”</b>.
-            </p>
-
-            <p>
-            😊 The dominant audience sentiment is
-            <b>{dominant_sentiment}</b>.
-            </p>
-
-            <p>
-            🎭 The dominant detected emotion is
-            <b>{dominant_emotion}</b>.
-            </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
+            **Most repeated phrase:** {
+                top_phrases[0][0] if top_phrases else "None detected"
+            }
+            """
         )
 
-    # ======================================================
-    # TOP COMMENTS
-    # ======================================================
+        if sentiment_column:
+            valid_sentiments = data[
+                data[sentiment_column] != "Unknown"
+            ][sentiment_column]
 
-    st.markdown(
-        "### 💬 Feedback Behind the Trends"
+            if not valid_sentiments.empty:
+                dominant_sentiment = valid_sentiments.mode().iloc[0]
+                st.write(
+                    f"**Dominant audience sentiment:** {dominant_sentiment}"
+                )
+
+        if emotion_column:
+            valid_emotions = data[
+                ~data[emotion_column].str.lower().isin(
+                    ["", "nan", "none", "unknown"]
+                )
+            ][emotion_column]
+
+            if not valid_emotions.empty:
+                dominant_emotion = valid_emotions.mode().iloc[0]
+                st.write(
+                    f"**Dominant detected emotion:** {dominant_emotion}"
+                )
+    else:
+        st.info("There is not enough text to generate trend insights.")
+
+    # --------------------------------------------------------
+    # RECORD EXPLORER
+    # --------------------------------------------------------
+
+    st.divider()
+    st.subheader("🔎 Explore Records")
+
+    search_query = st.text_input(
+        "Search uploaded content",
+        placeholder="Search for a word or phrase...",
+        key="trend_search_query",
     )
 
-    if "sentiment" in data.columns:
+    filtered = data.copy()
 
-        display_cols = [
-            text_col,
-            "sentiment"
+    if search_query.strip():
+        filtered = filtered[
+            filtered[text_column].str.contains(
+                search_query.strip(),
+                case=False,
+                regex=False,
+                na=False,
+            )
         ]
 
-        if "emotion" in data.columns:
-            display_cols.append(
-                "emotion"
-            )
+    st.caption(f"{len(filtered):,} matching records")
 
-        st.dataframe(
-            data[
-                display_cols
-            ].head(20),
+    display_columns = [text_column]
 
-            use_container_width=True,
+    if sentiment_column:
+        display_columns.append(sentiment_column)
 
-            hide_index=True
-        )
+    if emotion_column:
+        display_columns.append(emotion_column)
 
-    else:
-
-        st.dataframe(
-            data[
-                [text_col]
-            ].head(20),
-
-            use_container_width=True,
-
-            hide_index=True
-        )
-
-    # ======================================================
-    # EXPORT
-    # ======================================================
-
-    st.markdown(
-        "### ⬇️ Export"
+    st.dataframe(
+        filtered[display_columns].head(100),
+        use_container_width=True,
+        hide_index=True,
     )
+
+    # --------------------------------------------------------
+    # EXPORT
+    # --------------------------------------------------------
+
+    st.divider()
+    st.subheader("⬇️ Export Trend Results")
 
     export_df = pd.DataFrame(
         top_words,
-        columns=[
-            "Topic",
-            "Mentions"
-        ]
+        columns=["Topic", "Mentions"],
     )
 
     st.download_button(
         "Download Trend Results",
-
-        data=export_df.to_csv(
-            index=False
-        ).encode("utf-8"),
-
+        data=export_df.to_csv(index=False).encode("utf-8-sig"),
         file_name="trend_analysis.csv",
-
         mime="text/csv",
+        use_container_width=True,
+    )
 
-        use_container_width=True
+    st.download_button(
+        "Download Filtered Records",
+        data=filtered.to_csv(index=False).encode("utf-8-sig"),
+        file_name="trend_filtered_records.csv",
+        mime="text/csv",
+        use_container_width=True,
     )
 
 
 show_trend = show
+
+
+if __name__ == "__main__":
+    show()

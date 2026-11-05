@@ -7,38 +7,38 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+
+# ==========================================================
+# CONFIGURATION
+# ==========================================================
+
 HISTORY_FILE = Path("analysis_history.json")
 DETAILS_DIR = Path("analysis_details")
 MAX_HISTORY = 50
 
 
-# --------------------------------------------------
-# HISTORY STORAGE
-# --------------------------------------------------
+# ==========================================================
+# SHARED DATA
+# ==========================================================
 
-def load_history():
-    if not HISTORY_FILE.exists():
-        return []
+def get_shared_analysis_data():
+    """Return the dataset currently shared across application pages."""
 
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as file:
-            data = json.load(file)
+    for key in ("analysis_df", "universal_analysis_df", "df"):
+        candidate = st.session_state.get(key)
 
-        return data if isinstance(data, list) else []
+        if isinstance(candidate, pd.DataFrame) and not candidate.empty:
+            return candidate.copy()
 
-    except (json.JSONDecodeError, OSError):
-        return []
+    return None
 
 
-def _write(history):
-    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(HISTORY_FILE, "w", encoding="utf-8") as file:
-        json.dump(history, file, indent=4, ensure_ascii=False)
-
+# ==========================================================
+# JSON UTILITIES
+# ==========================================================
 
 def _json_safe(value):
-    """Convert common Python, Pandas and NumPy values to JSON-safe values."""
+    """Convert Pandas, NumPy, and Python objects into JSON-safe values."""
 
     if value is None:
         return None
@@ -55,6 +55,12 @@ def _json_safe(value):
     if isinstance(value, pd.Series):
         return _json_safe(value.to_dict())
 
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return value.isoformat()
+
+    if isinstance(value, Path):
+        return str(value)
+
     if hasattr(value, "item") and callable(value.item):
         try:
             value = value.item()
@@ -67,14 +73,12 @@ def _json_safe(value):
     if isinstance(value, float) and not math.isfinite(value):
         return None
 
-    if pd.isna(value) if not isinstance(value, (str, bytes, list, tuple, dict)) else False:
-        return None
-
-    if isinstance(value, (datetime, pd.Timestamp)):
-        return value.isoformat()
-
-    if isinstance(value, Path):
-        return str(value)
+    if not isinstance(value, (str, bytes, list, tuple, dict)):
+        try:
+            if pd.isna(value):
+                return None
+        except (TypeError, ValueError):
+            pass
 
     if isinstance(value, (str, int, float, bool)):
         return value
@@ -82,11 +86,53 @@ def _json_safe(value):
     return str(value)
 
 
+# ==========================================================
+# HISTORY STORAGE
+# ==========================================================
+
+def load_history():
+    """Load saved history summaries."""
+
+    if not HISTORY_FILE.exists():
+        return []
+
+    try:
+        with HISTORY_FILE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if not isinstance(data, list):
+            return []
+
+        return [
+            item for item in data
+            if isinstance(item, dict)
+        ]
+
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _write(history):
+    """Save history summaries safely."""
+
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    with HISTORY_FILE.open("w", encoding="utf-8") as file:
+        json.dump(
+            _json_safe(history),
+            file,
+            indent=4,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+
+
 def _details_path(item_id):
-    """Build a safe details-file path from a history ID."""
+    """Build a safe path for a saved analysis detail file."""
 
     safe_id = "".join(
-        character for character in str(item_id)
+        character
+        for character in str(item_id)
         if character.isalnum() or character in ("-", "_")
     )
 
@@ -97,7 +143,7 @@ def _details_path(item_id):
 
 
 def load_history_details(item):
-    """Load the full details for one history entry, if they were saved."""
+    """Load detailed results associated with a history entry."""
 
     if not isinstance(item, dict):
         return None
@@ -107,8 +153,8 @@ def load_history_details(item):
     if not details_file:
         return None
 
-    # Only accept filenames stored directly inside our details directory.
     filename = Path(str(details_file)).name
+
     if filename != str(details_file):
         return None
 
@@ -118,11 +164,16 @@ def load_history_details(item):
         return None
 
     try:
-        with open(path, "r", encoding="utf-8") as file:
+        with path.open("r", encoding="utf-8") as file:
             return json.load(file)
+
     except (json.JSONDecodeError, OSError):
         return None
 
+
+# ==========================================================
+# SAVE ANALYSIS HISTORY
+# ==========================================================
 
 def save_history(
     analysis_type,
@@ -133,22 +184,26 @@ def save_history(
     details=None,
 ):
     """
-    Save summary information and, optionally, the full analysis details.
+    Save an analysis summary and optional detailed results.
 
-    Existing calls to save_history() still work because details is optional.
+    Existing calls to save_history() remain compatible.
     """
 
     history = load_history()
     now = datetime.now()
-
     item_id = now.strftime("%Y%m%d%H%M%S%f")
+
+    try:
+        record_count = max(0, int(records_count))
+    except (TypeError, ValueError):
+        record_count = 0
 
     item = {
         "id": item_id,
         "date": now.strftime("%d %b %Y, %I:%M %p"),
         "type": str(analysis_type),
         "source": str(source_name),
-        "records": int(records_count),
+        "records": record_count,
         "sentiment": str(sentiment),
         "emotion": str(emotion),
     }
@@ -160,7 +215,7 @@ def save_history(
             detail_path = _details_path(item_id)
             safe_details = _json_safe(details)
 
-            with open(detail_path, "w", encoding="utf-8") as file:
+            with detail_path.open("w", encoding="utf-8") as file:
                 json.dump(
                     safe_details,
                     file,
@@ -173,18 +228,23 @@ def save_history(
             item["details_available"] = True
 
         except (OSError, TypeError, ValueError) as error:
-            st.warning(f"Analysis summary saved, but detailed results could not be saved: {error}")
+            st.warning(
+                f"History summary saved, but detailed results "
+                f"could not be saved: {error}"
+            )
 
     history.insert(0, item)
 
-    # Keep only the most recent MAX_HISTORY entries.
+    # Keep the most recent MAX_HISTORY entries.
     removed_items = history[MAX_HISTORY:]
     history = history[:MAX_HISTORY]
+
     _write(history)
 
-    # Remove detail files belonging to entries dropped by the history limit.
+    # Remove detail files for entries dropped by the history limit.
     for removed in removed_items:
         path = _details_path(removed.get("id", ""))
+
         if path and path.exists():
             try:
                 path.unlink()
@@ -192,14 +252,21 @@ def save_history(
                 pass
 
 
+# ==========================================================
+# DELETE HISTORY
+# ==========================================================
+
 def delete_history_items(ids):
+    """Delete selected history entries."""
+
     ids = {str(item_id) for item_id in ids}
     history = load_history()
     remaining = []
 
     for item in history:
-        if str(item.get("id")) in ids:
+        if str(item.get("id", "")) in ids:
             path = _details_path(item.get("id", ""))
+
             if path and path.exists():
                 try:
                     path.unlink()
@@ -212,12 +279,17 @@ def delete_history_items(ids):
 
 
 def delete_history_item(item_id):
+    """Delete one history entry."""
+
     delete_history_items({item_id})
 
 
 def clear_history():
+    """Clear all history summaries and their detail files."""
+
     for item in load_history():
         path = _details_path(item.get("id", ""))
+
         if path and path.exists():
             try:
                 path.unlink()
@@ -227,24 +299,45 @@ def clear_history():
     _write([])
 
 
-# --------------------------------------------------
+# ==========================================================
 # DISPLAY HELPERS
-# --------------------------------------------------
+# ==========================================================
 
 def _type_icon(value):
-    return {
-        "youtube": "📺",
-        "text": "📝",
-        "csv": "📂",
-    }.get(str(value).lower(), "📊")
+    value = str(value).lower()
+
+    if "youtube" in value:
+        return "📺"
+
+    if "text" in value:
+        return "📝"
+
+    if "csv" in value or "upload" in value:
+        return "📂"
+
+    return "📊"
 
 
 def _sentiment_icon(value):
-    return {
-        "positive": "😊",
-        "negative": "😟",
-        "neutral": "😐",
-    }.get(str(value).lower(), "🔎")
+    value = str(value).lower()
+
+    if value == "positive":
+        return "😊"
+
+    if value == "negative":
+        return "😟"
+
+    if value == "neutral":
+        return "😐"
+
+    return "🔎"
+
+
+def _safe_int(value):
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _show_value(value):
@@ -252,25 +345,36 @@ def _show_value(value):
         return "Not available"
 
     if isinstance(value, (dict, list)):
-        return json.dumps(value, indent=2, ensure_ascii=False)
+        return json.dumps(
+            _json_safe(value),
+            indent=2,
+            ensure_ascii=False,
+        )
 
     return str(value)
 
 
-# --------------------------------------------------
+# ==========================================================
 # INDIVIDUAL ANALYSIS DETAILS
-# --------------------------------------------------
+# ==========================================================
 
 def _show_analysis_details(item):
-    st.markdown(f"## {_type_icon(item.get('type'))} Analysis Details")
 
-    left, right = st.columns(2)
+    st.subheader(
+        f"{_type_icon(item.get('type'))} Analysis Details"
+    )
 
-    with left:
-        st.metric("Records Analyzed", f"{int(item.get('records', 0)):,}")
+    col1, col2 = st.columns(2)
 
-    with right:
-        st.metric("Analysis Type", str(item.get("type", "Unknown")))
+    col1.metric(
+        "Records Analyzed",
+        f"{_safe_int(item.get('records', 0)):,}",
+    )
+
+    col2.metric(
+        "Analysis Type",
+        str(item.get("type", "Unknown")),
+    )
 
     st.markdown("### 📌 Analysis Summary")
 
@@ -284,68 +388,66 @@ def _show_analysis_details(item):
     if details is None:
         st.info(
             "Full details are not available for this entry. "
-            "This analysis was saved without a detailed-results file, "
-            "or its details file is missing. Older history entries cannot "
-            "recover results that were never saved."
+            "The summary may have been saved without detailed results, "
+            "or the details file may be missing."
         )
         return
 
     if not isinstance(details, dict):
-        st.warning("The saved details have an unexpected format.")
         st.json(details)
         return
 
     st.markdown("### 🔍 Saved Results")
 
-    # Display extra metadata separately from the full result records.
     metadata = details.get("metadata", {})
 
     if isinstance(metadata, dict) and metadata:
-        with st.expander("Source and analysis information", expanded=True):
+        with st.expander(
+            "Source and analysis information",
+            expanded=True,
+        ):
             for key, value in metadata.items():
-                st.write(f"**{str(key).replace('_', ' ').title()}:**")
+                label = str(key).replace("_", " ").title()
+                st.write(f"**{label}:**")
                 st.write(_show_value(value))
 
-    # Show the original text when it was saved.
     original_text = details.get("text")
 
     if original_text is not None:
         st.markdown("#### 📝 Original Text")
+
         st.text_area(
             "Text used for analysis",
             value=str(original_text),
             height=180,
             disabled=True,
-            key=f"history_original_text_{item.get('id')}",
+            key=f"history_text_{item.get('id')}",
         )
 
-    # Show individual results as a table if the analyzer saved them.
     records = details.get("records")
 
     if isinstance(records, list) and records:
-        st.markdown(f"#### 📊 Individual Results ({len(records):,} records)")
-
         results_df = pd.DataFrame(records)
 
-        if not results_df.empty:
-            st.dataframe(
-                results_df,
-                use_container_width=True,
-                hide_index=True,
-            )
+        st.markdown(
+            f"#### 📊 Individual Results ({len(results_df):,} records)"
+        )
 
-            csv_data = results_df.to_csv(index=False).encode("utf-8")
+        st.dataframe(
+            results_df,
+            use_container_width=True,
+            hide_index=True,
+        )
 
-            st.download_button(
-                "⬇️ Download Detailed Results (CSV)",
-                data=csv_data,
-                file_name=f"analysis_{item.get('id', 'details')}.csv",
-                mime="text/csv",
-                key=f"history_download_{item.get('id')}",
-                use_container_width=True,
-            )
+        st.download_button(
+            "⬇️ Download Detailed Results (CSV)",
+            data=results_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"analysis_{item.get('id', 'details')}.csv",
+            mime="text/csv",
+            key=f"history_download_{item.get('id')}",
+            use_container_width=True,
+        )
 
-    # Display any remaining details not already rendered.
     remaining_details = {
         key: value
         for key, value in details.items()
@@ -353,85 +455,73 @@ def _show_analysis_details(item):
     }
 
     if remaining_details:
-        with st.expander("Additional saved information"):
+        with st.expander("Additional Saved Information"):
             st.json(remaining_details)
 
-    if not original_text and not records and not metadata and not remaining_details:
-        st.info("The detailed-results file is empty.")
 
-
-# --------------------------------------------------
+# ==========================================================
 # MAIN HISTORY PAGE
-# --------------------------------------------------
+# ==========================================================
 
 def show():
-    st.markdown("""
-    <style>
-    .history-hero {
-        padding:24px 28px;
-        border-radius:20px;
-        margin-bottom:22px;
-        color:white;
-        background:linear-gradient(135deg,#667eea,#764ba2,#f093fb);
-    }
-    .history-hero h1 {
-        color:white;
-        margin:0;
-        font-size:2.15rem;
-    }
-    .history-hero p {
-        color:rgba(255,255,255,.9);
-        margin:7px 0 0;
-    }
-    .hcard {
-        border:1px solid rgba(128,128,128,.22);
-        border-radius:16px;
-        padding:17px;
-        margin:7px 0;
-        background:rgba(128,128,128,.035);
-    }
-    .htop {
-        display:flex;
-        justify-content:space-between;
-        gap:15px;
-        flex-wrap:wrap;
-    }
-    .hsource {
-        font-size:15px;
-        font-weight:650;
-        margin:10px 0 14px;
-        word-break:break-word;
-    }
-    .hdetails {
-        display:flex;
-        gap:30px;
-        flex-wrap:wrap;
-    }
-    .hdetail span {
-        display:block;
-        font-size:11px;
-        opacity:.6;
-    }
-    .hdetail strong {
-        font-size:13px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="history-hero">
-        <h1>🕒 Analysis History</h1>
-        <p>Search previous analyses and open saved results in detail.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        .history-hero {
+            padding: 24px 28px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+            color: white;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
 
-    # Keep the selected detail page open across Streamlit reruns.
+        .history-hero h1 {
+            color: white;
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .history-hero p {
+            color: rgba(255,255,255,.9);
+            margin: 7px 0 0;
+        }
+
+        .history-card {
+            border: 1px solid rgba(128,128,128,.25);
+            border-radius: 14px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="history-hero">
+            <h1>🕒 Analysis History</h1>
+            <p>Search previous analyses and review saved results.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     history = load_history()
+
+    # ------------------------------------------------------
+    # OPEN ONE HISTORY ENTRY
+    # ------------------------------------------------------
+
     detail_id = st.session_state.get("history_detail_id")
 
     if detail_id:
         selected_item = next(
-            (x for x in history if str(x.get("id")) == str(detail_id)),
+            (
+                item for item in history
+                if str(item.get("id")) == str(detail_id)
+            ),
             None,
         )
 
@@ -440,71 +530,124 @@ def show():
             st.warning("This history entry no longer exists.")
             st.rerun()
 
-        if st.button("← Back to Analysis History", use_container_width=False):
+        if st.button("← Back to Analysis History"):
             st.session_state.pop("history_detail_id", None)
             st.rerun()
 
         _show_analysis_details(selected_item)
         return
 
+    # ------------------------------------------------------
+    # CURRENT DATASET PREVIEW
+    # ------------------------------------------------------
+
+    with st.expander("📂 Current Shared Dataset", expanded=False):
+
+        current_df = get_shared_analysis_data()
+
+        if current_df is None:
+            st.info(
+                "No current dataset is available in this session. "
+                "Upload a CSV or run an analysis first."
+            )
+        else:
+            col1, col2 = st.columns(2)
+
+            col1.metric("Current Records", f"{len(current_df):,}")
+            col2.metric("Columns", f"{len(current_df.columns):,}")
+
+            st.dataframe(
+                current_df.head(10),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    # ------------------------------------------------------
+    # EMPTY STATE
+    # ------------------------------------------------------
+
     if not history:
-        st.info("🗂️ No analysis history yet. Analyze YouTube, Text or CSV data first.")
+        st.info(
+            "🗂️ No saved analysis history yet. "
+            "Run an analysis that calls save_history() to create an entry."
+        )
         return
 
-    # Summary cards.
-    total_records = sum(int(x.get("records", 0)) for x in history)
-    positive = sum(
-        str(x.get("sentiment", "")).lower() == "positive"
-        for x in history
+    # ------------------------------------------------------
+    # OVERVIEW
+    # ------------------------------------------------------
+
+    total_records = sum(
+        _safe_int(item.get("records", 0))
+        for item in history
     )
-    types_count = len(set(str(x.get("type", "Analysis")) for x in history))
 
-    a, b, c, d = st.columns(4)
-    a.metric("📚 Saved Analyses", len(history))
-    b.metric("📊 Total Records", f"{total_records:,}")
-    c.metric("😊 Positive Analyses", positive)
-    d.metric("📂 Analysis Types", types_count)
+    positive_analyses = sum(
+        str(item.get("sentiment", "")).strip().lower() == "positive"
+        for item in history
+    )
 
-    st.markdown("### 🔎 Find an Analysis")
+    analysis_types = len(
+        set(str(item.get("type", "Analysis")) for item in history)
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("📚 Saved Analyses", len(history))
+    col2.metric("📊 Total Records", f"{total_records:,}")
+    col3.metric("😊 Positive Analyses", positive_analyses)
+    col4.metric("📂 Analysis Types", analysis_types)
+
+    # ------------------------------------------------------
+    # SEARCH AND FILTERS
+    # ------------------------------------------------------
+
+    st.subheader("🔎 Find an Analysis")
 
     f1, f2, f3 = st.columns([1.5, 1, 1])
 
     with f1:
         search = st.text_input(
             "Search",
-            placeholder="Source, type, sentiment, emotion...",
+            placeholder="Source, type, sentiment, or emotion...",
+            key="history_search",
         )
 
+    available_types = sorted(
+        set(str(item.get("type", "Analysis")) for item in history)
+    )
+
     with f2:
-        types_list = ["All"] + sorted(
-            set(str(x.get("type", "Analysis")) for x in history)
+        selected_type = st.selectbox(
+            "Analysis Type",
+            ["All"] + available_types,
+            key="history_type_filter",
         )
-        selected_type = st.selectbox("Type", types_list)
 
     with f3:
         selected_sentiment = st.selectbox(
             "Sentiment",
             ["All", "Positive", "Neutral", "Negative"],
+            key="history_sentiment_filter",
         )
 
     filtered = []
 
     for item in history:
-        typ = str(item.get("type", "Analysis"))
+        analysis_type = str(item.get("type", "Analysis"))
         sentiment = str(item.get("sentiment", ""))
+        source = str(item.get("source", ""))
+        emotion = str(item.get("emotion", ""))
+        date = str(item.get("date", ""))
 
-        searchable = " ".join([
-            typ,
-            str(item.get("source", "")),
-            sentiment,
-            str(item.get("emotion", "")),
-            str(item.get("date", "")),
-        ]).lower()
+        searchable_text = (
+            f"{analysis_type} {sentiment} {source} {emotion} {date}"
+        ).lower()
 
-        if search.strip() and search.strip().lower() not in searchable:
+        if search.strip().lower() not in searchable_text:
             continue
 
-        if selected_type != "All" and typ != selected_type:
+        if selected_type != "All" and analysis_type != selected_type:
             continue
 
         if (
@@ -515,114 +658,185 @@ def show():
 
         filtered.append(item)
 
-    st.markdown("### 📋 Saved Analyses")
-    st.caption(f"Showing {len(filtered)} of {len(history)} saved analyses.")
+    st.subheader("📋 Saved Analyses")
+
+    st.caption(
+        f"Showing {len(filtered)} of {len(history)} saved analyses."
+    )
 
     if not filtered:
-        st.warning("No history items match your filters.")
+        st.warning("No history entries match your filters.")
         return
 
-    select_all = st.checkbox("☑️ Select all visible items")
+    # ------------------------------------------------------
+    # HISTORY CARDS
+    # ------------------------------------------------------
+
+    select_all = st.checkbox(
+        "Select all visible entries",
+        key="history_select_all",
+    )
+
     selected_ids = []
 
-    for i, item in enumerate(filtered):
-        item_id = str(item.get("id", i))
-        typ = str(item.get("type", "Analysis"))
+    for index, item in enumerate(filtered):
+        item_id = str(item.get("id", index))
+        analysis_type = str(item.get("type", "Analysis"))
         sentiment = str(item.get("sentiment", "Unknown"))
         source = str(item.get("source", "Unknown source"))
+        emotion = str(item.get("emotion", "Unknown"))
 
-        check_col, card_col = st.columns([0.06, 0.94])
+        with st.container(border=True):
 
-        with check_col:
-            checked = st.checkbox(
-                "",
-                value=select_all,
-                key=f"history_select_{item_id}",
-            )
+            checkbox_col, details_col = st.columns([0.08, 0.92])
 
-            if checked:
-                selected_ids.append(item_id)
+            with checkbox_col:
+                checked = st.checkbox(
+                    "Select",
+                    value=select_all,
+                    key=f"history_select_{item_id}",
+                    label_visibility="collapsed",
+                )
 
-        with card_col:
-            st.markdown(f"""
-            <div class="hcard">
-                <div class="htop">
-                    <div><b>{_type_icon(typ)} {typ}</b></div>
-                    <div>🕒 {item.get("date", "")}</div>
-                </div>
-                <div class="hsource">{source}</div>
-                <div class="hdetails">
-                    <div class="hdetail">
-                        <span>Records</span>
-                        <strong>{int(item.get("records", 0)):,}</strong>
-                    </div>
-                    <div class="hdetail">
-                        <span>Sentiment</span>
-                        <strong>{_sentiment_icon(sentiment)} {sentiment}</strong>
-                    </div>
-                    <div class="hdetail">
-                        <span>Emotion</span>
-                        <strong>🎭 {item.get("emotion", "Unknown")}</strong>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                if checked:
+                    selected_ids.append(item_id)
 
-            if st.button(
-                "🔍 View Details",
-                key=f"history_view_{item_id}",
-                use_container_width=True,
-            ):
-                st.session_state.history_detail_id = item_id
-                st.rerun()
+            with details_col:
+                st.markdown(
+                    f"**{_type_icon(analysis_type)} {analysis_type}**"
+                )
+
+                st.caption(item.get("date", "Date unavailable"))
+
+                st.write(f"**Source:** {source}")
+
+                a, b, c = st.columns(3)
+
+                a.metric(
+                    "Records",
+                    f"{_safe_int(item.get('records', 0)):,}",
+                )
+
+                b.metric(
+                    "Sentiment",
+                    f"{_sentiment_icon(sentiment)} {sentiment}",
+                )
+
+                c.metric("Emotion", emotion)
+
+                if item.get("details_available"):
+                    st.caption("Detailed results saved")
+
+                if st.button(
+                    "🔍 View Details",
+                    key=f"history_view_{item_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state["history_detail_id"] = item_id
+                    st.rerun()
+
+    # ------------------------------------------------------
+    # DELETE ACTIONS
+    # ------------------------------------------------------
 
     st.divider()
 
-    x, y = st.columns(2)
+    left, right = st.columns(2)
 
-    with x:
+    with left:
         if st.button(
             f"🗑️ Delete Selected ({len(selected_ids)})",
             disabled=not selected_ids,
             use_container_width=True,
         ):
             delete_history_items(selected_ids)
+            st.session_state.pop("history_select_all", None)
             st.rerun()
 
-    with y:
+    with right:
         if st.button(
             "🧹 Clear Entire History",
             use_container_width=True,
         ):
-            st.session_state.confirm_clear_history = True
+            st.session_state["confirm_clear_history"] = True
 
     if st.session_state.get("confirm_clear_history", False):
-        st.warning("⚠️ This permanently deletes all saved history and detail files.")
 
-        p, q = st.columns(2)
+        st.warning(
+            "This permanently deletes saved history summaries and "
+            "their associated detail files."
+        )
 
-        with p:
-            if st.button("Yes, Clear Everything", use_container_width=True):
+        confirm_col, cancel_col = st.columns(2)
+
+        with confirm_col:
+            if st.button(
+                "Yes, Clear History",
+                use_container_width=True,
+            ):
                 clear_history()
-                st.session_state.confirm_clear_history = False
+                st.session_state["confirm_clear_history"] = False
                 st.session_state.pop("history_detail_id", None)
+                st.session_state.pop("history_select_all", None)
                 st.rerun()
 
-        with q:
-            if st.button("Cancel", use_container_width=True):
-                st.session_state.confirm_clear_history = False
+        with cancel_col:
+            if st.button(
+                "Cancel",
+                use_container_width=True,
+            ):
+                st.session_state["confirm_clear_history"] = False
                 st.rerun()
 
-    st.markdown("### 📊 History Distribution")
+    # ------------------------------------------------------
+    # HISTORY DISTRIBUTION
+    # ------------------------------------------------------
+
+    st.divider()
+    st.subheader("📈 Analysis Type Distribution")
 
     distribution = (
-        pd.Series([str(x.get("type", "Analysis")) for x in history])
+        pd.Series([
+            str(item.get("type", "Analysis"))
+            for item in filtered
+        ])
         .value_counts()
         .rename_axis("Analysis Type")
         .to_frame("Count")
     )
 
-    st.bar_chart(distribution, use_container_width=True)
+    st.bar_chart(distribution)
 
+    # ------------------------------------------------------
+    # EXPORT FILTERED HISTORY
+    # ------------------------------------------------------
+
+    st.subheader("⬇️ Export History")
+
+    export_df = pd.DataFrame([
+        {
+            "Date": item.get("date", ""),
+            "Analysis Type": item.get("type", ""),
+            "Source": item.get("source", ""),
+            "Records": item.get("records", 0),
+            "Sentiment": item.get("sentiment", ""),
+            "Emotion": item.get("emotion", ""),
+            "Details Available": item.get("details_available", False),
+        }
+        for item in filtered
+    ])
+
+    st.download_button(
+        "Download Filtered History (CSV)",
+        data=export_df.to_csv(index=False).encode("utf-8"),
+        file_name="analysis_history.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
+# ==========================================================
+# COMPATIBILITY ALIAS
+# ==========================================================
 
 show_history = show

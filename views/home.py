@@ -227,7 +227,7 @@ def show():
 
     with c3:
         _card(
-            "CSV Upload",
+            "File Analyzer",
             "Upload a dataset containing comments or other text records.",
             "📄",
         )
@@ -250,7 +250,7 @@ def show():
     f1, f2, f3, f4, f5 = st.columns(5)
 
     steps = [
-        (f1, "📥", "Input", "YouTube / Text / CSV"),
+        (f1, "📥", "Input", "YouTube / Text / Files"),
         (f2, "🧹", "Prepare", "Clean & validate"),
         (f3, "🧠", "Analyze", "Sentiment + emotion"),
         (f4, "📊", "Explore", "Charts + trends"),
@@ -366,7 +366,7 @@ def show():
             <div class="home-note">
                 No analysis is loaded in the current session yet.
                 Choose <strong>YouTube Analyzer</strong>, <strong>Text Analyzer</strong>,
-                or <strong>CSV Upload</strong> from the sidebar to begin.
+                or <strong>File Analyzer</strong> from the sidebar to begin.
             </div>
             """,
             unsafe_allow_html=True,

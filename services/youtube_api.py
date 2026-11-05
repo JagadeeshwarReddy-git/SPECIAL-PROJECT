@@ -1,3 +1,4 @@
+
 import os
 import re
 
@@ -36,7 +37,7 @@ class YouTubeAPI:
         self.youtube = build(
             "youtube",
             "v3",
-            developerKey=self.api_key
+            developerKey=self.api_key,
         )
 
     # ======================================================
@@ -52,7 +53,6 @@ class YouTubeAPI:
         url = str(url).strip()
 
         patterns = [
-
             r"(?:youtube\.com/watch\?v=)"
             r"([A-Za-z0-9_-]{11})",
 
@@ -70,20 +70,13 @@ class YouTubeAPI:
         ]
 
         for pattern in patterns:
-
-            match = re.search(
-                pattern,
-                url
-            )
+            match = re.search(pattern, url)
 
             if match:
                 return match.group(1)
 
-        # Raw video ID
-        if re.fullmatch(
-            r"[A-Za-z0-9_-]{11}",
-            url
-        ):
+        # Accept a raw YouTube video ID.
+        if re.fullmatch(r"[A-Za-z0-9_-]{11}", url):
             return url
 
         return None
@@ -100,104 +93,91 @@ class YouTubeAPI:
             return None
 
         try:
-
             response = (
                 self.youtube
                 .videos()
                 .list(
-                    part="snippet,statistics",
-                    id=video_id
+                    part="snippet,statistics,contentDetails",
+                    id=video_id,
                 )
                 .execute()
             )
 
         except HttpError as e:
-
             raise RuntimeError(
-                "YouTube API error while "
-                f"fetching video details:\n{e}"
-            )
+                "YouTube API error while fetching video details:\n"
+                f"{e}"
+            ) from e
 
-        items = response.get(
-            "items",
-            []
-        )
+        items = response.get("items", [])
 
         if not items:
             return None
 
         item = items[0]
 
-        snippet = item.get(
-            "snippet",
-            {}
-        )
+        snippet = item.get("snippet", {})
+        statistics = item.get("statistics", {})
+        content_details = item.get("contentDetails", {})
 
-        statistics = item.get(
-            "statistics",
-            {}
-        )
-
-        thumbnails = snippet.get(
-            "thumbnails",
-            {}
-        )
+        thumbnails = snippet.get("thumbnails", {})
 
         thumbnail = (
-            thumbnails
-            .get("high", {})
-            .get("url")
+            thumbnails.get("high", {}).get("url")
+            or thumbnails.get("medium", {}).get("url")
+            or thumbnails.get("default", {}).get("url")
         )
 
-        if not thumbnail:
+        # NEW: Description and additional video context.
+        description = snippet.get("description", "")
 
-            thumbnail = (
-                thumbnails
-                .get("default", {})
-                .get("url")
-            )
+        tags = snippet.get("tags", [])
 
         return {
-
             "video_id": video_id,
 
             "title": snippet.get(
                 "title",
-                "Unknown Title"
+                "Unknown Title",
             ),
+
+            "description": description,
 
             "channel": snippet.get(
                 "channelTitle",
-                "Unknown Channel"
+                "Unknown Channel",
             ),
 
             "published": snippet.get(
                 "publishedAt",
-                "Unknown"
+                "Unknown",
+            ),
+
+            "category_id": snippet.get(
+                "categoryId",
+                "",
+            ),
+
+            "tags": tags,
+
+            "duration": content_details.get(
+                "duration",
+                "",
             ),
 
             "views": int(
-                statistics.get(
-                    "viewCount",
-                    0
-                )
+                statistics.get("viewCount", 0)
             ),
 
             "likes": int(
-                statistics.get(
-                    "likeCount",
-                    0
-                )
+                statistics.get("likeCount", 0)
             ),
 
             "comments": int(
-                statistics.get(
-                    "commentCount",
-                    0
-                )
+                statistics.get("commentCount", 0)
             ),
 
-            "thumbnail": thumbnail
+            "thumbnail": thumbnail,
         }
 
     # ======================================================
@@ -207,52 +187,31 @@ class YouTubeAPI:
     def get_comments(
         self,
         video_id,
-        max_comments=MAX_COMMENTS
+        max_comments=MAX_COMMENTS,
     ):
         """
         Fetch up to 10,000 top-level YouTube comments.
 
-        YouTube returns a maximum of 100 comment threads
-        per API request.
-
-        This method automatically follows nextPageToken
-        until the requested number of comments is reached
-        or there are no more pages.
+        Automatically follows nextPageToken until the requested
+        number of comments is reached or no more pages remain.
         """
 
         if not video_id:
-
             raise ValueError(
                 "A YouTube video ID is required."
             )
 
-        # --------------------------------------------------
-        # Validate requested limit
-        # --------------------------------------------------
-
         try:
-
-            max_comments = int(
-                max_comments
-            )
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
+            max_comments = int(max_comments)
+        except (TypeError, ValueError):
             max_comments = MAX_COMMENTS
 
         max_comments = max(
             1,
-            min(
-                max_comments,
-                MAX_COMMENTS
-            )
+            min(max_comments, MAX_COMMENTS),
         )
 
         comments = []
-
         next_page_token = None
 
         # ==================================================
@@ -261,36 +220,24 @@ class YouTubeAPI:
 
         while len(comments) < max_comments:
 
-            remaining = (
-                max_comments
-                - len(comments)
-            )
+            remaining = max_comments - len(comments)
 
             request_size = min(
                 PAGE_SIZE,
-                remaining
+                remaining,
             )
 
             try:
-
                 response = (
-
                     self.youtube
                     .commentThreads()
                     .list(
-
                         part="snippet",
-
                         videoId=video_id,
-
                         maxResults=request_size,
-
                         pageToken=next_page_token,
-
                         textFormat="plainText",
-
-                        order="relevance"
-
+                        order="relevance",
                     )
                     .execute()
                 )
@@ -299,106 +246,77 @@ class YouTubeAPI:
 
                 error_text = str(e)
 
-                # ------------------------------------------
-                # Comments disabled
-                # ------------------------------------------
-
                 if (
-                    "commentsDisabled"
-                    in error_text
-                    or
-                    "disabled comments"
-                    in error_text.lower()
+                    "commentsDisabled" in error_text
+                    or "disabled comments" in error_text.lower()
                 ):
-
                     raise RuntimeError(
-                        "Comments are disabled "
-                        "for this video."
-                    )
+                        "Comments are disabled for this video."
+                    ) from e
 
                 raise RuntimeError(
-                    "YouTube API error while "
-                    f"fetching comments:\n{e}"
-                )
+                    "YouTube API error while fetching comments:\n"
+                    f"{e}"
+                ) from e
 
-            items = response.get(
-                "items",
-                []
-            )
+            items = response.get("items", [])
 
-            # No more comments
             if not items:
                 break
 
-            # ==================================================
+            # ==============================================
             # PROCESS CURRENT PAGE
-            # ==================================================
+            # ==============================================
 
             for item in items:
 
                 try:
-
                     snippet = (
-                        item
-                        ["snippet"]
+                        item["snippet"]
                         ["topLevelComment"]
                         ["snippet"]
                     )
 
                     comment = {
-
                         "author": snippet.get(
                             "authorDisplayName",
-                            "Unknown"
+                            "Unknown",
                         ),
 
                         "text": snippet.get(
                             "textDisplay",
-                            ""
+                            "",
                         ),
 
                         "likes": int(
-                            snippet.get(
-                                "likeCount",
-                                0
-                            )
+                            snippet.get("likeCount", 0)
                         ),
 
                         "published": snippet.get(
                             "publishedAt",
-                            ""
-                        )
+                            "",
+                        ),
                     }
 
-                    comments.append(
-                        comment
-                    )
+                    comments.append(comment)
 
                 except (
                     KeyError,
                     TypeError,
-                    ValueError
+                    ValueError,
                 ):
-
                     continue
 
-                # Reached requested limit
                 if len(comments) >= max_comments:
                     break
 
-            # ==================================================
+            # ==============================================
             # NEXT PAGE
-            # ==================================================
+            # ==============================================
 
-            next_page_token = (
-                response.get(
-                    "nextPageToken"
-                )
-            )
+            next_page_token = response.get("nextPageToken")
 
             if not next_page_token:
                 break
 
-        return comments[
-            :max_comments
-        ]
+        return comments[:max_comments]

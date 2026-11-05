@@ -1,39 +1,181 @@
+
+/* ==========================================
+   GLOBAL THEME — ALL PAGES
+   ========================================== */
+
+:root {
+    color-scheme: light;
+}
+
 .stApp {
-    background-color: #f5f7fa;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef9 100%);
+    color: #172033;
 }
 
-h1 {
-    color: #0f172a;
-    font-weight: 700;
+/* Main content text */
+.stApp .main,
+.stApp [data-testid="stMain"] {
+    color: #172033;
 }
 
-h2 {
-    color: #1e293b;
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4,
+.stApp h5,
+.stApp h6,
+.stApp p,
+.stApp label,
+.stApp li,
+.stApp [data-testid="stMarkdownContainer"] {
+    color: #172033;
 }
 
+/* Keep muted text readable */
+.stApp .stCaption,
+.stApp small {
+    color: #475569;
+}
+
+/* Sidebar */
 section[data-testid="stSidebar"] {
-    background-color: #0f172a;
+    background: linear-gradient(180deg, #0f172a 0%, #1e3a5f 100%);
 }
 
-section[data-testid="stSidebar"] * {
-    color: white;
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: #ffffff;
 }
 
-div[data-testid="metric-container"] {
-    background: white;
+/* Cards and metric containers */
+.stApp [data-testid="stMetric"],
+.stApp [data-testid="stExpander"],
+.stApp [data-testid="stAlert"] {
     border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0px 3px 10px rgba(0,0,0,0.15);
 }
 
-.stButton>button {
-    background-color: #2563eb;
-    color: white;
-    border-radius: 8px;
+.stApp [data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #dbe3ef;
+    padding: 16px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.07);
+}
+
+.stApp [data-testid="stMetric"] label,
+.stApp [data-testid="stMetric"] [data-testid="stMetricValue"],
+.stApp [data-testid="stMetric"] [data-testid="stMetricDelta"] {
+    color: #172033;
+}
+
+/* Inputs */
+.stApp input,
+.stApp textarea,
+.stApp [data-baseweb="input"] input,
+.stApp [data-baseweb="textarea"] textarea {
+    background-color: #ffffff;
+    color: #172033 !important;
+    -webkit-text-fill-color: #172033;
+    border-color: #cbd5e1;
+    caret-color: #172033;
+}
+
+/* Dropdowns and multiselects */
+.stApp [data-baseweb="select"] > div {
+    background-color: #ffffff;
+    color: #172033;
+    border-color: #cbd5e1;
+}
+
+.stApp [data-baseweb="select"] *,
+.stApp [role="option"] {
+    color: #172033;
+}
+
+/* File uploader */
+.stApp [data-testid="stFileUploader"] {
+    background: #ffffff;
+    color: #172033;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.stApp [data-testid="stFileUploader"] * {
+    color: #172033;
+}
+
+/* Dataframes and tables */
+.stApp [data-testid="stDataFrame"],
+.stApp [data-testid="stTable"] {
+    color: #172033;
+}
+
+/* Buttons — preserve gradient design */
+.stApp .stButton > button,
+.stApp .stDownloadButton > button,
+.stApp [data-testid="stFormSubmitButton"] > button {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    color: #ffffff !important;
     border: none;
-    font-weight: bold;
+    border-radius: 8px;
+    font-weight: 600;
 }
 
-.stButton>button:hover {
-    background-color: #1d4ed8;
+.stApp .stButton > button *,
+.stApp .stDownloadButton > button *,
+.stApp [data-testid="stFormSubmitButton"] > button * {
+    color: #ffffff !important;
+}
+
+.stApp .stButton > button:hover,
+.stApp .stDownloadButton > button:hover {
+    filter: brightness(1.1);
+}
+
+/* Links */
+.stApp a {
+    color: #1d4ed8;
+}
+
+/* Home page custom cards */
+.home-welcome,
+.home-card,
+.home-flow,
+.home-stat {
+    background: #ffffff !important;
+    color: #172033 !important;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+}
+
+.home-welcome *,
+.home-card *,
+.home-flow *,
+.home-stat * {
+    color: #172033 !important;
+}
+
+.home-welcome .home-welcome-text,
+.home-card .home-card-text,
+.home-subtitle,
+.flow-caption,
+.home-stat-label {
+    color: #475569 !important;
+}
+
+/* Dashboard custom cards */
+.stApp .platform-card,
+.stApp .dashboard-card {
+    color: #172033;
+}
+
+/* Keep chart layout responsive */
+.stApp [data-testid="stPlotlyChart"],
+.stApp [data-testid="stVegaLiteChart"] {
+    max-width: 100%;
 }

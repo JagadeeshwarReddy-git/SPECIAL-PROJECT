@@ -1,42 +1,27 @@
 import streamlit as st
 
-# ==========================================
-# Configuration
-# ==========================================
-
 from config import APP_NAME, APP_VERSION
 
-# ==========================================
-# Load CSS
-# ==========================================
 
 def load_css():
     try:
-        with open("assets/style.css") as f:
+        with open("assets/style.css", encoding="utf-8") as css_file:
             st.markdown(
-                f"<style>{f.read()}</style>",
-                unsafe_allow_html=True
+                f"<style>{css_file.read()}</style>",
+                unsafe_allow_html=True,
             )
-    except:
+    except FileNotFoundError:
         pass
 
-
-load_css()
-
-# ==========================================
-# Page Configuration
-# ==========================================
 
 st.set_page_config(
     page_title=APP_NAME,
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ==========================================
-# Import Views
-# ==========================================
+load_css()
 
 from views import (
     home,
@@ -47,51 +32,49 @@ from views import (
     reports,
     trend,
     assistant,
-    insights,
     history,
-    dashboard
+    dashboard,
 )
 
-# ==========================================
-# Session State
-# ==========================================
-
+# Shared state used by the existing pages.
+# Do not overwrite existing analysis data on every Streamlit rerun.
 if "analysis_df" not in st.session_state:
-    st.session_state.analysis_df = None
+    st.session_state["analysis_df"] = None
 
 if "video_details" not in st.session_state:
-    st.session_state.video_details = None
+    st.session_state["video_details"] = None
 
-# ==========================================
-# Sidebar
-# ==========================================
+
+# Sidebar navigation
+page_options = [
+    "🏠 Home",
+    "📺 YouTube Analyzer",
+    "📝 Text Analyzer",
+    "📂 File Analyzer",
+    "📊 Analytics",
+    "📈 Trend Analyzer",
+    "🤖 AI Assistant",
+    "📄 Reports",
+    "🕒 History",
+    "📉 Dashboard",
+]
+
 
 with st.sidebar:
-
     st.title("🤖 AI Analytics")
-
     st.caption(f"Version {APP_VERSION}")
-
     st.divider()
 
-    page_options = [
-        "🏠 Home",
-        "📺 YouTube Analyzer",
-        "📝 Text Analyzer",
-        "📂 CSV Upload",
-        "📊 Analytics",
-        "📈 Trend Analyzer",
-        "🤖 AI Assistant",
-        "🧠 AI Insights",
-        "📄 Reports",
-        "🕒 History",
-        "📉 Dashboard",
-    ]
-
+    # Preserve navigation requests made by other pages.
     if "navigation_page" in st.session_state:
         requested_page = st.session_state.pop("navigation_page")
+
         if requested_page in page_options:
             st.session_state["Navigation"] = requested_page
+
+    # Migrate the old CSV Upload label.
+    if st.session_state.get("Navigation") == "📂 CSV Upload":
+        st.session_state["Navigation"] = "📂 File Analyzer"
 
     page = st.radio(
         "Navigation",
@@ -100,25 +83,23 @@ with st.sidebar:
     )
 
     st.divider()
-
     st.success("System Ready")
 
-# ==========================================
-# Navigation
-# ==========================================
 
+# Page routing
 pages = {
     "🏠 Home": home.show,
     "📺 YouTube Analyzer": youtube.show,
     "📝 Text Analyzer": text.show,
-    "📂 CSV Upload": csv_upload.show,
+    "📂 File Analyzer": csv_upload.show,
     "📊 Analytics": analytics.show,
     "📈 Trend Analyzer": trend.show,
     "🤖 AI Assistant": assistant.show,
-    "🧠 AI Insights": insights.show,
     "📄 Reports": reports.show,
     "🕒 History": history.show,
     "📉 Dashboard": dashboard.show,
 }
 
+
+# Display the selected page
 pages[page]()
