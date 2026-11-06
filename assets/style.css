@@ -1,181 +1,612 @@
 
-/* ==========================================
-   GLOBAL THEME — ALL PAGES
-   ========================================== */
+/* =====================================================
+   AI-BASED SOCIAL MEDIA ANALYTICS
+   PROFESSIONAL LIGHT UI
+   ===================================================== */
 
 :root {
     color-scheme: light;
+
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --secondary: #7c3aed;
+
+    --background: #f5f7fb;
+    --surface: #ffffff;
+
+    --text: #172033;
+    --muted: #64748b;
+
+    --border: #e2e8f0;
+
+    --radius: 14px;
+
+    --shadow:
+        0 4px 16px rgba(15, 23, 42, 0.06);
 }
+
+
+/* =====================================================
+   MAIN APPLICATION
+   ===================================================== */
 
 .stApp {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef9 100%);
-    color: #172033;
+
+    background:
+        linear-gradient(
+            135deg,
+            #f5f7fb 0%,
+            #edf2ff 100%
+        );
+
+    color: var(--text);
+
 }
 
-/* Main content text */
-.stApp .main,
+
+/* Main content */
+
 .stApp [data-testid="stMain"] {
-    color: #172033;
+
+    color: var(--text);
+
 }
 
-.stApp h1,
-.stApp h2,
-.stApp h3,
+
+/* =====================================================
+   TYPOGRAPHY
+   ===================================================== */
+
+.stApp h1 {
+
+    color: #0f172a;
+
+    font-weight: 800;
+
+    letter-spacing: -0.5px;
+
+}
+
+.stApp h2 {
+
+    color: #172033;
+
+    font-weight: 750;
+
+}
+
+.stApp h3 {
+
+    color: #1e293b;
+
+    font-weight: 700;
+
+}
+
 .stApp h4,
 .stApp h5,
-.stApp h6,
+.stApp h6 {
+
+    color: #334155;
+
+    font-weight: 650;
+
+}
+
 .stApp p,
-.stApp label,
-.stApp li,
-.stApp [data-testid="stMarkdownContainer"] {
-    color: #172033;
+.stApp li {
+
+    color: #334155;
+
+    line-height: 1.65;
+
 }
 
-/* Keep muted text readable */
-.stApp .stCaption,
-.stApp small {
-    color: #475569;
+.stApp small,
+.stApp .stCaption {
+
+    color: var(--muted);
+
 }
 
-/* Sidebar */
+
+/* =====================================================
+   SIDEBAR
+   ===================================================== */
+
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a 0%, #1e3a5f 100%);
+
+    background:
+        linear-gradient(
+            180deg,
+            #0f172a 0%,
+            #172554 55%,
+            #1e3a5f 100%
+        );
+
+    border-right: 1px solid #263752;
+
 }
+
+
+/* Sidebar text */
 
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] h4,
 section[data-testid="stSidebar"] p,
 section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-    color: #ffffff;
+section[data-testid="stSidebar"] span {
+
+    color: #f8fafc;
+
 }
 
-/* Cards and metric containers */
-.stApp [data-testid="stMetric"],
-.stApp [data-testid="stExpander"],
-.stApp [data-testid="stAlert"] {
-    border-radius: 12px;
+
+/* Sidebar radio navigation */
+
+section[data-testid="stSidebar"] [role="radiogroup"] {
+
+    gap: 6px;
+
 }
+
+
+/* Sidebar radio labels */
+
+section[data-testid="stSidebar"] [role="radio"] {
+
+    border-radius: 10px;
+
+    padding: 8px 10px;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease;
+
+}
+
+
+/* Sidebar hover */
+
+section[data-testid="stSidebar"] [role="radio"]:hover {
+
+    background: rgba(255, 255, 255, 0.10);
+
+}
+
+
+/* Sidebar selected item */
+
+section[data-testid="stSidebar"] [role="radio"][aria-checked="true"] {
+
+    background: rgba(59, 130, 246, 0.25);
+
+    border: 1px solid rgba(147, 197, 253, 0.35);
+
+}
+
+
+/* =====================================================
+   METRIC CARDS
+   ===================================================== */
 
 .stApp [data-testid="stMetric"] {
-    background: #ffffff;
-    border: 1px solid #dbe3ef;
-    padding: 16px;
-    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.07);
+
+    background: var(--surface);
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--radius);
+
+    padding: 18px;
+
+    box-shadow: var(--shadow);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+
 }
 
-.stApp [data-testid="stMetric"] label,
-.stApp [data-testid="stMetric"] [data-testid="stMetricValue"],
-.stApp [data-testid="stMetric"] [data-testid="stMetricDelta"] {
-    color: #172033;
+
+/* Metric hover */
+
+.stApp [data-testid="stMetric"]:hover {
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 8px 22px rgba(15, 23, 42, 0.09);
+
 }
 
-/* Inputs */
-.stApp input,
-.stApp textarea,
-.stApp [data-baseweb="input"] input,
-.stApp [data-baseweb="textarea"] textarea {
-    background-color: #ffffff;
-    color: #172033 !important;
-    -webkit-text-fill-color: #172033;
-    border-color: #cbd5e1;
-    caret-color: #172033;
+
+/* Metric text */
+
+.stApp [data-testid="stMetric"] label {
+
+    color: #64748b;
+
+    font-weight: 600;
+
 }
 
-/* Dropdowns and multiselects */
-.stApp [data-baseweb="select"] > div {
-    background-color: #ffffff;
-    color: #172033;
-    border-color: #cbd5e1;
+.stApp [data-testid="stMetric"] [data-testid="stMetricValue"] {
+
+    color: #0f172a;
+
+    font-weight: 800;
+
 }
 
-.stApp [data-baseweb="select"] *,
-.stApp [role="option"] {
-    color: #172033;
-}
 
-/* File uploader */
-.stApp [data-testid="stFileUploader"] {
-    background: #ffffff;
-    color: #172033;
-    border: 1px solid #dbe3ef;
-    border-radius: 12px;
-    padding: 12px;
-}
+/* =====================================================
+   BUTTONS
+   ===================================================== */
 
-.stApp [data-testid="stFileUploader"] * {
-    color: #172033;
-}
-
-/* Dataframes and tables */
-.stApp [data-testid="stDataFrame"],
-.stApp [data-testid="stTable"] {
-    color: #172033;
-}
-
-/* Buttons — preserve gradient design */
 .stApp .stButton > button,
 .stApp .stDownloadButton > button,
 .stApp [data-testid="stFormSubmitButton"] > button {
-    background: linear-gradient(135deg, #2563eb, #7c3aed);
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--primary),
+            var(--secondary)
+        );
+
     color: #ffffff !important;
+
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+
+    border-radius: 10px;
+
+    padding: 10px 18px;
+
+    font-weight: 700;
+
+    transition:
+        transform 0.2s ease,
+        filter 0.2s ease,
+        box-shadow 0.2s ease;
+
+    box-shadow:
+        0 4px 12px rgba(37, 99, 235, 0.18);
+
 }
+
+
+/* Button text */
 
 .stApp .stButton > button *,
 .stApp .stDownloadButton > button *,
 .stApp [data-testid="stFormSubmitButton"] > button * {
+
     color: #ffffff !important;
+
 }
+
+
+/* Button hover */
 
 .stApp .stButton > button:hover,
 .stApp .stDownloadButton > button:hover {
-    filter: brightness(1.1);
+
+    filter: brightness(1.08);
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 16px rgba(37, 99, 235, 0.25);
+
 }
 
-/* Links */
+
+/* =====================================================
+   INPUTS
+   ===================================================== */
+
+.stApp input,
+.stApp textarea,
+.stApp [data-baseweb="input"] input,
+.stApp [data-baseweb="textarea"] textarea {
+
+    background-color: #ffffff;
+
+    color: #172033 !important;
+
+    -webkit-text-fill-color: #172033;
+
+    border-color: #cbd5e1;
+
+    border-radius: 9px;
+
+    caret-color: #172033;
+
+}
+
+
+/* Input focus */
+
+.stApp input:focus,
+.stApp textarea:focus {
+
+    border-color: #3b82f6;
+
+    box-shadow:
+        0 0 0 2px rgba(59, 130, 246, 0.15);
+
+}
+
+
+/* =====================================================
+   DROPDOWNS
+   ===================================================== */
+
+.stApp [data-baseweb="select"] > div {
+
+    background-color: #ffffff;
+
+    color: #172033;
+
+    border-color: #cbd5e1;
+
+    border-radius: 9px;
+
+}
+
+.stApp [data-baseweb="select"] *,
+.stApp [role="option"] {
+
+    color: #172033;
+
+}
+
+
+/* =====================================================
+   FILE UPLOADER
+   ===================================================== */
+
+.stApp [data-testid="stFileUploader"] {
+
+    background: #ffffff;
+
+    color: #172033;
+
+    border: 1px dashed #cbd5e1;
+
+    border-radius: var(--radius);
+
+    padding: 16px;
+
+}
+
+
+/* =====================================================
+   EXPANDERS
+   ===================================================== */
+
+.stApp [data-testid="stExpander"] {
+
+    background: #ffffff;
+
+    border: 1px solid var(--border);
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+}
+
+
+/* =====================================================
+   ALERTS
+   ===================================================== */
+
+.stApp [data-testid="stAlert"] {
+
+    border-radius: 12px;
+
+}
+
+
+/* =====================================================
+   DATAFRAMES
+   ===================================================== */
+
+.stApp [data-testid="stDataFrame"],
+.stApp [data-testid="stTable"] {
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+}
+
+
+/* =====================================================
+   CHARTS
+   ===================================================== */
+
+.stApp [data-testid="stPlotlyChart"],
+.stApp [data-testid="stVegaLiteChart"] {
+
+    max-width: 100%;
+
+    background: #ffffff;
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--radius);
+
+    padding: 8px;
+
+}
+
+
+/* =====================================================
+   LINKS
+   ===================================================== */
+
 .stApp a {
-    color: #1d4ed8;
+
+    color: #2563eb;
+
+    font-weight: 600;
+
+    text-decoration: none;
+
 }
 
-/* Home page custom cards */
+.stApp a:hover {
+
+    color: #1d4ed8;
+
+    text-decoration: underline;
+
+}
+
+
+/* =====================================================
+   HOME PAGE CARDS
+   ===================================================== */
+
 .home-welcome,
 .home-card,
 .home-flow,
 .home-stat {
+
     background: #ffffff !important;
+
     color: #172033 !important;
-    border: 1px solid #dbe3ef;
-    border-radius: 12px;
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--radius);
+
+    box-shadow: var(--shadow);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+
 }
+
+
+/* Home card hover */
+
+.home-card:hover,
+.home-stat:hover {
+
+    transform: translateY(-3px);
+
+    box-shadow:
+        0 8px 20px rgba(15, 23, 42, 0.08);
+
+}
+
+
+/* Home card text */
 
 .home-welcome *,
 .home-card *,
 .home-flow *,
 .home-stat * {
+
     color: #172033 !important;
+
 }
+
+
+/* Muted home text */
 
 .home-welcome .home-welcome-text,
 .home-card .home-card-text,
 .home-subtitle,
 .flow-caption,
 .home-stat-label {
-    color: #475569 !important;
+
+    color: #64748b !important;
+
 }
 
-/* Dashboard custom cards */
+
+/* =====================================================
+   DASHBOARD CARDS
+   ===================================================== */
+
 .stApp .platform-card,
 .stApp .dashboard-card {
+
+    background: #ffffff;
+
     color: #172033;
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--radius);
+
+    box-shadow: var(--shadow);
+
 }
 
-/* Keep chart layout responsive */
-.stApp [data-testid="stPlotlyChart"],
-.stApp [data-testid="stVegaLiteChart"] {
-    max-width: 100%;
+
+/* =====================================================
+   DIVIDERS
+   ===================================================== */
+
+.stApp hr {
+
+    border-color: #e2e8f0;
+
+}
+
+
+/* =====================================================
+   RESPONSIVE DESIGN
+   ===================================================== */
+
+@media (max-width: 768px) {
+
+    .stApp h1 {
+
+        font-size: 1.7rem;
+
+    }
+
+    .stApp h2 {
+
+        font-size: 1.35rem;
+
+    }
+
+    .stApp [data-testid="stMetric"] {
+
+        padding: 12px;
+
+    }
+
+    .stApp .stButton > button {
+
+        width: 100%;
+
+    }
+
+}
+
+
+/* =====================================================
+   ACCESSIBILITY
+   ===================================================== */
+
+.stApp button:focus-visible,
+.stApp input:focus-visible,
+.stApp textarea:focus-visible {
+
+    outline: 2px solid #60a5fa;
+
+    outline-offset: 2px;
+
 }
